@@ -27,6 +27,7 @@ class YOLO(object):
         "iou" : 0.45,
         "model_image_size" : (416, 416),
         "gpu_num" : 1,
+        "color": (255,255,255),
     }
 
     @classmethod
@@ -109,7 +110,7 @@ class YOLO(object):
         else:
             new_image_size = (image.width - (image.width % 32),
                               image.height - (image.height % 32))
-            boxed_image = letterbox_image(image, new_image_size)
+            boxed_image = letterbox_image(image, new_image_size, color=self.color)
         image_data = np.array(boxed_image, dtype='float32')
 
         print(image_data.shape)
@@ -127,7 +128,7 @@ class YOLO(object):
         print('Found {} boxes for {}'.format(len(out_boxes), 'img'))
 
         font = ImageFont.truetype(font='font/FiraMono-Medium.otf',
-                    size=np.floor(3e-2 * image.size[1] + 0.5).astype('int32'))
+                    size=np.floor(3e-1 * image.size[1] + 0.5).astype('int32'))
         thickness = (image.size[0] + image.size[1]) // 300
 
         for i, c in reversed(list(enumerate(out_classes))):

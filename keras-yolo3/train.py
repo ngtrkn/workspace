@@ -12,6 +12,7 @@ from keras.callbacks import TensorBoard, ModelCheckpoint, ReduceLROnPlateau, Ear
 from yolo3.model import preprocess_true_boxes, yolo_body, tiny_yolo_body, yolo_loss
 from yolo3.utils import get_random_data
 
+from sklearn.utils import class_weight
 
 def _main():
     annotation_path = '/mnt/sda1/code/dev/data/mark/train_marucheck_750.txt'
@@ -47,7 +48,17 @@ def _main():
     num_val = int(len(lines)*val_split)
     num_train = len(lines) - num_val
 
-    # Train with frozen layers first, to get a stable loss.
+    # Define class weights
+    label_indexes = []
+    for line in lines:
+        label_indexes = label_indexes + [box.split(',')[-1] for box in line.split('\n')[0].split(' ')[1:]]
+
+    class_weights = class_weight.compute_class_weight(
+        'balanced',
+        np.unique(label_indexes),
+        label_indexes
+    )
+        # Train with frozen layers first, to get a stable loss.
     # Adjust num epochs to your dataset. This step is enough to obtain a not bad model.
     if True:
         model.compile(optimizer=Adam(lr=1e-3), loss={
@@ -60,9 +71,10 @@ def _main():
                 steps_per_epoch=max(1, num_train//batch_size),
                 validation_data=data_generator_wrapper(lines[num_train:], batch_size, input_shape, anchors, num_classes),
                 validation_steps=max(1, num_val//batch_size),
-                epochs=50,
+                epochs=100,
                 initial_epoch=0,
-                callbacks=[logging, checkpoint])
+                callbacks=[logging, checkpoint],
+                class_weight=class_weights)
         model.save_weights(log_dir + 'trained_weights_stage_1.h5')
 
     # Unfreeze and continue training, to fine-tune.
@@ -79,9 +91,11 @@ def _main():
             steps_per_epoch=max(1, num_train//batch_size),
             validation_data=data_generator_wrapper(lines[num_train:], batch_size, input_shape, anchors, num_classes),
             validation_steps=max(1, num_val//batch_size),
-            epochs=200,
-            initial_epoch=50,
-            callbacks=[logging, checkpoint, reduce_lr, early_stopping])
+            epochs=300,
+            initial_epoch=100,
+            callbacks=[logging, checkpoint, reduce_lr, early_stopping],
+            class_weight=class_weights,
+        )
         model.save_weights(log_dir + 'trained_weights_final.h5')
 
     # Further training if needed.
