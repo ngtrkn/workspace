@@ -1,0 +1,25 @@
+model:
+  detect_opacity: false # doing image enhancement on low opacity images
+  do_merge: false # merge horizontal textline with threshold
+  post_processor:
+    - LayoutPostprocessor
+    - MultiOrientationPostprocessor # default - take first one
+  pre_processor:
+    - LayoutPreprocessor
+    - NPI_LayoutPreprocessor # default - take first one
+  process_height:
+    - 256
+    - 1536 # initial input size of images, default - take first one
+  recheck_stamp: false # doing image enhancement to detect stamp again
+  stamp_detection: false # activate stamp mask branch in backbone
+  use_separator_to_cut_textline: False # cut textline with sep mask
+  use_attention: False
+  freeze_bn: False
+  scale: 1
+
+train:
+  use_lovasz: False # Use dice loss (False) or lovasz (True)
+  alpha: 1 # BCE Loss weight
+  beta: 1.2 # Dice Loss weight
+  clip_gradient: True
+

@@ -138,7 +138,8 @@ class AUnet(nn.Module):
 
 
         output = self.conv10(x9)
-        # output = torch.softmax(output, dim=1)
-        output = torch.sigmoid(output)
+        output = torch.softmax(output, dim=1)
+        # output = torch.sigmoid(output)
+        # output = torch.log_softmax(output)
 
         return output

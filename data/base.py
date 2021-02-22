@@ -67,9 +67,16 @@ class BaseDataset(Dataset):
                 for image in image_array_list
             ]
 
+        #TODO: export to 3 channel
+        image_array_list = [
+            None if image is None
+            else np.expand_dims(image, axis=-1) if len(image.shape)==2 else image
+            for image in image_array_list
+        ]
+
         #TODO:
         image_array_list = [
-            np.pad(image, ((32, 32),(32,32),(0,0)), 'constant', constant_values=255)
+            np.pad(image, ((32, 32),(32,32),(0,0)), 'constant', constant_values=150)
             if image is not None else None 
             for i, image in enumerate(image_array_list)
         ]
@@ -82,10 +89,10 @@ class BaseDataset(Dataset):
             for i, image in enumerate(image_array_list)
         ]
 
-        #TODO: export to 3 channel
+        #TODO: transpose to 3 channel
         image_array_list = [
             None if image is None
-            else np.expand_dims(image, axis=0) if len(image.shape)==2 else np.transpose(image, (2,0,1))
+            else np.transpose(image, (2,0,1))
             for image in image_array_list
         ]
         

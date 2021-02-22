@@ -1,0 +1,69 @@
+# Choose name of model. Current supported: jeff, tadashi
+model: "segment"
+
+# Session code used as prefix of saved file
+session_code: "segment/AUnet-v0"
+
+# Paths to pretrained weights (.pth or .pt), if left blank, train from scratch
+# pretrained_path: "checkpoints/JeffLayout-Kawasakikisen-Finetune-1536/JeffLayout-Kawasakikisen-Finetune-1536_epoch00010_F1-score0.895635217_Precision0.877025002_Recall0.921593639.pth"
+pretrained_path: #"D:/Workspace/cinnamon/code/weights/pretrain/layout/CEnetNoRotated_0.81_0.81.pth"
+
+# Number of training epochs
+n_epochs: 50
+
+# Batch size
+batch_size: 4
+
+# Number of workers in data loader
+num_workers: 4
+
+# Learning rate
+learning_rate: 0.001
+
+# Validate every n epochs
+n_epochs_validation: 1
+
+# metric to determine best checkpoint. Currently support: "F1-score", "Precision", "Recall"
+best_metrics:
+  - F1-score
+
+# Checkpoint will be saved if one of any best_metric improve.
+# If you want to save all ckpts, set to False
+save_best_only: False
+
+# "all": a checkpoint is consider better than last checpoint is all of its best_metrics result improved
+# "any": ___________________________________________________ is one of ________________________________
+metrics_compare_mode: all
+
+# If you want to automatically detect checkpoint and resume training ,set to True.
+# If you want to train from scratch with chosen pretrained_weight, set to False
+resume_training: True
+
+# Paths to train dataset
+train_dataset:
+  - D:/Workspace/data/ADEChallengeData2016
+
+# Paths to valid dataset
+valid_dataset:
+  # - "Data/PoC_Kawasakikisen_SOF_validation.zip"
+
+# Use on-the-fly augmentation while training
+use_augmentation: False
+
+# Only run validation on valid dataset without trainingp
+valid_only: False
+
+# Do not show progress bar, good for SageMaker session
+disable_progress_bar: False
+
+# Path to checkpoint saving directory
+save_dir: "checkpoints/"
+
+# Extensions for saving and exporting
+model_save_extension: ".pth"
+model_export_extension: ".pt"
+
+# GPU devices ids: "-1" for cpu, or > 0 for choose gpu device, default using gpu-0
+gpu_ids: "0"
+
+num_classes: 151
