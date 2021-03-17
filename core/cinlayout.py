@@ -26,6 +26,7 @@ from data.layout_dataset import LayoutDataset, variable_mask_collate_fn
 
 
 from .base import BaseModel
+from train_utils.losses import bce_loss, dice_loss, contour_loss
 
 
 logger = logging.getLogger(__name__)
@@ -155,6 +156,7 @@ class LayoutModel(BaseModel):
         self.criterion= {
             'BCE': bce_loss,
             'Dice': dice_loss,
+            'Contour': contour_loss,
         }
         logger.info(f"Loading criteria {self.criterion}")
 
