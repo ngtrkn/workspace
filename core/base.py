@@ -89,6 +89,10 @@ def dice_loss(input_, target, ignore_index=-100):
 
     return 1 - ((2.0 * intersection + smooth) / (iflat.sum() + tflat.sum() + smooth))
 
+# from encoding.nn import SyncBatchNorm
+# import sys
+# sys.path.append("/mnt/sda1/code/github/PyTorch-Encoding/encoding/models/sseg")
+# from encoding.models.sseg.deeplab import DeepLabV3
 
 class BaseModel:
     def __init__(
@@ -112,7 +116,7 @@ class BaseModel:
                 self.cfg = yaml.load(f, Loader=yaml.FullLoader)
 
         #TODO: set up parameters
-        
+        self.mode = mode
 
         #TODO: setup device
         if (device != "-1") and (torch.cuda.is_available()):
@@ -127,7 +131,13 @@ class BaseModel:
             self.device = 'cpu'
 
         # model
-        self.model = AINet(input_channels=input_channels, nclasses=num_classes)
+        self.model = AINet(num_classes)
+        # self.model = AINet(input_channels=input_channels, nclasses=num_classes)
+        # self.model = DeepLabV3(num_classes, backbone='resnet50s', root='~/.encoding/models',
+        #                 aux = False,
+        #                 se_loss = False, 
+        #                 norm_layer = SyncBatchNorm,
+        #                 base_size=224, crop_size=192)
 
         # pretrain
         self.load(weights_path, mode=mode)

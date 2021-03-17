@@ -16,23 +16,17 @@ import torch.nn as nn
 import torch
 from torchvision.utils import save_image
 
-from models import AUnet as AINet
+# from models import AUnet as AINet
 # from models import Unet as AINet
 # from models import PAUnet as AINet
+sys.path.append('/mnt/sda1/code/github/lib-layout/layout/jeff')
+from backbone import CENet as AINet
 from train_utils.optimizer import Ranger
-from data.segment_dataset import SegmentDataset, variable_mask_collate_fn
-# from data_utils.map_color import create_ade20k_label_colormap
+from data.layout_dataset import LayoutDataset, variable_mask_collate_fn
+
 
 from .base import BaseModel
 
-# COLOR = create_ade20k_label_colormap()
-# def encodeCOLOR(torchIDX, COLOR=colors): 
-#     list_idx = torch.unique(torch.tensor(torchIDX, dtype=torch.long))
-#     labelmap_rgb = torch.zeros((torchIDX.shape[0], 3, torchIDX.shape[1], torchIDX.shape[2]))
-#     for idx in list_idx:
-#         labelmap_rgb += (torchIDX == label).unsqueeze(1) * \
-#             np.tile(colors[label],
-#                     (labelmap.shape[0], labelmap.shape[1], 1))
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -40,10 +34,46 @@ logging.basicConfig(level=logging.INFO)
 DEFAULT_CONFIG_PATH = Path(__file__).parent / "../config/segment_config.yaml"
 
 
+import functools
+
+def control_loss(loss_func):
+    """Print the function signature and return value"""
+    @functools.wraps(loss_func)
+    def wrapper_loss(*args, **kwargs):
+        #TODO: control empty input
+        num_target_dim = len(args[1].shape)
+        target_check = torch.amax(args[1], dim=[i for i in range(num_target_dim) if i > 0])
+        
+        #TODO: remove item
+        for v in args:
+            filt_v = [
+                item[ib:ib+1] for ib, item in enumerate(v)
+                if target_check[ib] >= 0
+            ]
+            if len(filt_v) == 0:
+                return 0
+            v = torch.cat(filt_v, dim=0)
+        # for ib, item in enumerate(target_check):
+        #     if item < 0:
+        #         print(f"{loss_func.__name__!r} ignore index {ib!r} due to {item!r} < 0")           # 1
+
+        value = loss_func(*args, **kwargs)
+
+        # print(f"{loss_func.__name__!r} return {value!r}")           # 2
+
+        
+        return value
+    return wrapper_loss
+
+
 BCE = nn.BCELoss(reduction="none")
+EPS = 1e-10
+# @control_loss
 def bce_loss(input_, target, ignore_index=-100, reduction='mean'):
     out = BCE(input_, target)
-    # out = out[target != ignore_index]
+    out = out[target != ignore_index]
+    if len(out) == 0:
+        return 0
     if reduction == "mean":
         return torch.mean(out)
     elif reduction == "sum":
@@ -51,24 +81,28 @@ def bce_loss(input_, target, ignore_index=-100, reduction='mean'):
     else:
         raise ValueError(f"reduction type does not support {reduction}")
 
+# @control_loss
+def dice_loss(input_, target, ignore_index=-100):
+    smooth = 1.0
+    # target[target == ignore_index] = 0
 
-# BCE = nn.BCELoss(reduction="none")
-# def bce_loss(input_, target, ignore_index=-100, reduction='mean'):
-#     out = BCE(input_, target)
-#     out = out[target != ignore_index]
-#     if reduction == "mean":
-#         return torch.mean(out)
-#     elif reduction == "sum":
-#         return torch.sum(out)
-#     else:
-#         raise ValueError(f"reduction type does not support {reduction}")
+    # iflat = input_.reshape(-1)
+    # tflat = target.view(-1)
+    iflat = input_[target != ignore_index]
+    tflat = target[target != ignore_index]
+    if len(iflat) == 0: return 0
+
+    intersection = (iflat * tflat).sum()
+
+    return 1 - ((2.0 * intersection + smooth) / (iflat.sum() + tflat.sum() + smooth))
 
 
-class SegmentModel(BaseModel):
+class LayoutModel(BaseModel):
     def __init__(self,
+        AINet=AINet,
         *args,
         **kwargs):
-        super(SegmentModel, self).__init__(*args, **kwargs)
+        super(LayoutModel, self).__init__(*args, AINet=AINet, **kwargs)
 
 
     @staticmethod
@@ -84,11 +118,9 @@ class SegmentModel(BaseModel):
     
     def _setup_optimizer_scheduler(
             self,
-            learning_rate: float=0.004,
+            learning_rate: float=1e-3,
             decayRate: int = 0.98):
-        # self.optimizer = Ranger(self.model.parameters(), learning_rate)
-        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=learning_rate,
-            momentum=0.9, weight_decay=0.0001)
+        self.optimizer = Ranger(self.model.parameters(), learning_rate)
         self.lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(
             optimizer=self.optimizer, gamma=decayRate)
         # Update learning rate
@@ -106,7 +138,7 @@ class SegmentModel(BaseModel):
             num_workers: int = 0,
             ):
         sample_list = self._prepare_data(x, y)
-        dataset = SegmentDataset(sample_list, default_height=default_height, in_channels=3)
+        dataset = LayoutDataset(sample_list, default_height=default_height, in_channels=1)
         logger.info(f"Loading dataset {dataset}")
         dataset_loader = DataLoader(
             dataset=dataset,
@@ -122,6 +154,7 @@ class SegmentModel(BaseModel):
     def _setup_criteria(self):
         self.criterion= {
             'BCE': bce_loss,
+            'Dice': dice_loss,
         }
         logger.info(f"Loading criteria {self.criterion}")
 
@@ -134,7 +167,7 @@ class SegmentModel(BaseModel):
         batch_size: int = 2,
         decayRate: int = 0.98,
         num_workers: int = 0,
-        default_height: int = 128,
+        default_height: int = 1024,
         disable_progress_bar: bool = False,
         use_augmentation=False,
         debug_path="layout_debug",
@@ -183,22 +216,31 @@ class SegmentModel(BaseModel):
 
             #TODO: loading data into device
             input_ = image.to(self.device).detach().float()
-            # targets = [mask.to(self.device).detach().long() for mask in masks_list] 
-            target_ = torch.cat([mask.unsqueeze(1) for mask in masks_list], 1).to(self.device).detach().float()
+            targets = [mask.to(self.device).detach().float() for mask in masks_list]
+            target_ = torch.cat([mask.unsqueeze(1) for mask in masks_list], dim=1)
 
             #TODO: inferring
-            output_ = self.model(input_)[0]
-            # outputs = [output_[:, i, :, :] for i in range(num_masks)]
+            output_ = self.model(input_)
+            outputs = [output_[:, i, :, :] for i in range(num_masks)]
 
             #TODO: calculating losses
             postfix_progress = {}
             loss = 0
             with torch.autograd.set_detect_anomaly(True):
                 for _name, _func in self.criterion.items():
-                    loss_value = _func(torch.sigmoid(output_), target_)
+                    loss_values = [
+                        _func(output, target)
+                        for output, target in zip(outputs, targets)
+                    ]
+                    loss_values = [v for v in loss_values if v > 0]
+                    loss_value = sum(loss_values) / len(loss_values)
 
                     postfix_progress[_name] = loss_value.detach().item()
-                
+
+
+                    if 'Dice' in _name: loss_value = 1.5 * loss_value
+
+
                     #TODO: updating model weights
                     loss_value.backward(retain_graph=True)
                     if self.cfg["train"]["clip_gradient"]:
@@ -219,27 +261,11 @@ class SegmentModel(BaseModel):
                     writer.add_scalar(f"train_iteration/{name}", value, self.current_epoch*n_batches + iteration)
 
             #TODO: store debug
-            if (iteration + 1) % 100 == 0:
-                pred = torch.argmax(output_, dim=1, keepdim=True).detach().cpu()
-
-                outputs = torch.cat(
-                    [
-                        torch.argmax(output_, dim=1, keepdim=True).detach().cpu().float()/150,
-                        torch.argmax(output_, dim=1, keepdim=True).detach().cpu().float()/150,
-                        torch.argmax(output_, dim=1, keepdim=True).detach().cpu().float()/150
-                    ], dim=1
-                )
-                targets = torch.cat(
-                    [
-                        torch.argmax(target_, dim=1, keepdim=True).detach().cpu().float()/150,
-                        torch.argmax(target_, dim=1, keepdim=True).detach().cpu().float()/150,
-                        torch.argmax(target_, dim=1, keepdim=True).detach().cpu().float()/150
-                    ], dim=1
-                )
+            if (iteration + 1) % 200 == 0:
                 save_image(torch.cat(
                         [(1 + image) / 2.] + \
-                        [outputs] + \
-                        [targets], dim=0),
+                        [output.unsqueeze(1).detach().cpu() for output in outputs] + \
+                        [target.unsqueeze(1).detach().cpu() for target in targets], dim=0),
                     f"{debug_path}/{self.current_epoch}_{iteration}.jpg",
                     nrow=output_.shape[0], 
                     normalize=False)
@@ -250,9 +276,9 @@ class SegmentModel(BaseModel):
 
     def save(self, path):
 
-        # if self.mode == "inference":
-        #     raise RuntimeError(
-        #         "Model in inference mode, consider using export() method")
+        if self.mode == "inference":
+            raise RuntimeError(
+                "Model in inference mode, consider using export() method")
 
         _, ext = os.path.splitext(path)
 
@@ -293,10 +319,11 @@ class SegmentModel(BaseModel):
 
 
 if __name__=='__main__':
-    model = SegmentModel(
+    model = LayoutModel(
         device='0',
         weights_path=None, #r'D:\Workspace\cinnamon\code\prj\kawasakikisen\train\layout\lib-layout\scripts\checkpoints\JeffLayout-v0\JeffLayout-v0_epoch00010.pth',
-        mode="training"
+        mode="training",
+        num_classes=4,
     )
 
     #TODO: test inference
@@ -304,20 +331,29 @@ if __name__=='__main__':
     # exit(0)
     #TODO: test fitting
     x = [
-        r'D:\Workspace\data\FFHQ\thumbnails128x128\00000\00725.png',
-        r'D:\Workspace\data\FFHQ\thumbnails128x128\00000\00726.png',
-        r'D:\Workspace\data\FFHQ\thumbnails128x128\00000\00727.png',
+        '/mnt/sda1/data/cinnamon/layout/Invoice_Train/AruNET_Invoice_Training/マ_カイロスマーケティング_0.jpg',
+        '/mnt/sda1/data/cinnamon/layout/Invoice_Train/AruNET_Invoice_Training/マ_ネットプロテクションズ_0.jpg',
+        '/mnt/sda1/data/cinnamon/layout/Invoice_Train/AruNET_Invoice_Training/アロマ_0.jpg',
     ]
 
     y = [
         [
-            r'D:\Workspace\data\FFHQ\thumbs\00000\00725.png',
+            '/mnt/sda1/data/cinnamon/layout/Invoice_Train/AruNET_Invoice_Training/マ_カイロスマーケティング_0_GT0.jpg',
+            '/mnt/sda1/data/cinnamon/layout/Invoice_Train/AruNET_Invoice_Training/マ_カイロスマーケティング_0_GT1.jpg',
+            '/mnt/sda1/data/cinnamon/layout/Invoice_Train/AruNET_Invoice_Training/マ_カイロスマーケティング_0_GT2.jpg',
+            '',
         ],
         [
-            r'D:\Workspace\data\FFHQ\thumbs\00000\00726.png',
+            '/mnt/sda1/data/cinnamon/layout/Invoice_Train/AruNET_Invoice_Training/マ_ネットプロテクションズ_0_GT0.jpg',
+            '/mnt/sda1/data/cinnamon/layout/Invoice_Train/AruNET_Invoice_Training/マ_ネットプロテクションズ_0_GT1.jpg',
+            '/mnt/sda1/data/cinnamon/layout/Invoice_Train/AruNET_Invoice_Training/マ_ネットプロテクションズ_0_GT2.jpg',
+            '',
         ],
         [
-            r'D:\Workspace\data\FFHQ\thumbs\00000\00727.png',
+            '',
+            '/mnt/sda1/data/cinnamon/layout/Invoice_Train/AruNET_Invoice_Training/アロマ_0_GT1.jpg',
+            '/mnt/sda1/data/cinnamon/layout/Invoice_Train/AruNET_Invoice_Training/アロマ_0_GT2.jpg',
+            '/mnt/sda1/data/cinnamon/layout/Invoice_Train/AruNET_Invoice_Training/アロマ_0_GT0.jpg'
         ],
     ]
 

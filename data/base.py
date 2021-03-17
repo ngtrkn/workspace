@@ -75,11 +75,11 @@ class BaseDataset(Dataset):
         ]
 
         #TODO:
-        image_array_list = [
-            np.pad(image, ((32, 32),(32,32),(0,0)), 'constant', constant_values=150)
-            if image is not None else None 
-            for i, image in enumerate(image_array_list)
-        ]
+        # image_array_list = [
+        #     np.pad(image, ((32, 32),(32,32),(0,0)), 'constant', constant_values=150)
+        #     if image is not None else None 
+        #     for i, image in enumerate(image_array_list)
+        # ]
         
         #TODO: normalize
         image_array_list = [

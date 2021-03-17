@@ -1,24 +1,24 @@
 # Choose name of model. Current supported: jeff, tadashi
-model: "segment"
+model: "layout"
 
 # Session code used as prefix of saved file
-session_code: "segment/DEEPLABV3-resnet50s"
+session_code: "segment/CENet_3"
 
 # Paths to pretrained weights (.pth or .pt), if left blank, train from scratch
 # pretrained_path: "checkpoints/JeffLayout-Kawasakikisen-Finetune-1536/JeffLayout-Kawasakikisen-Finetune-1536_epoch00010_F1-score0.895635217_Precision0.877025002_Recall0.921593639.pth"
-pretrained_path: #"D:/Workspace/cinnamon/code/weights/pretrain/layout/CEnetNoRotated_0.81_0.81.pth"
+pretrained_path: /mnt/sda1/code/github/ngtrkn/workspace/checkpoints/segment/CENet_2/segment/CENet_2_epoch00050.pth
 
 # Number of training epochs
-n_epochs: 50
+n_epochs: 100
 
 # Batch size
-batch_size: 16
+batch_size: 4
 
 # Number of workers in data loader
 num_workers: 4
 
 # Learning rate
-learning_rate: 0.004
+learning_rate: 0.001
 
 # Validate every n epochs
 n_epochs_validation: 1
@@ -41,7 +41,15 @@ resume_training: True
 
 # Paths to train dataset
 train_dataset:
-  - /mnt/sda1/data/ADEChallengeData2016
+  - /mnt/sda1/data/cinnamon/layout/Invoice_Train/AruNET_Invoice_Training
+  - /mnt/sda1/data/cinnamon/layout/Medica_Train/Medica_All_prepared
+  - /mnt/sda1/data/cinnamon/layout/NTTD2_75
+  - /mnt/sda1/data/cinnamon/layout/NTTD2_98
+  - /mnt/sda1/data/cinnamon/layout/NTTD4
+  - /mnt/sda1/data/cinnamon/layout/SCSK_Train/SCSK_Train
+  - /mnt/sda1/data/cinnamon/layout/Yusen_20200311_0319_trainning_data/20200311_0319_trainning_data
+  - /mnt/sda1/data/cinnamon/layout/Yusen_20200323_0410_trainning_data_layout/Yusen_20200323_0410_trainning_data_layout
+  - /mnt/sda1/data/cinnamon/paragraph/masks
 
 # Paths to valid dataset
 valid_dataset:
@@ -66,4 +74,4 @@ model_export_extension: ".pt"
 # GPU devices ids: "-1" for cpu, or > 0 for choose gpu device, default using gpu-0
 gpu_ids: "0"
 
-num_classes: 151
+num_classes: 4

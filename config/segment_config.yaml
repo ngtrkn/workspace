@@ -8,8 +8,8 @@ model:
     - LayoutPreprocessor
     - NPI_LayoutPreprocessor # default - take first one
   process_height:
-    - 256
-    - 1536 # initial input size of images, default - take first one
+    # - 256
+    - 1152 # initial input size of images, default - take first one
   recheck_stamp: false # doing image enhancement to detect stamp again
   stamp_detection: false # activate stamp mask branch in backbone
   use_separator_to_cut_textline: False # cut textline with sep mask

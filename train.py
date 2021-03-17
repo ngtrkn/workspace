@@ -3,23 +3,28 @@ import os
 from torch.utils.tensorboard import SummaryWriter
 
 # from data_utils.create_data_retouch import create_train_data
-from data_utils.create_data_segment import create_train_data
+# from data_utils.create_data_segment import create_train_data
+from data_utils.create_data_layout import create_train_data
 
-from models import AUnet as AINet
+# from models import AUnet as AINet
+import sys
+sys.path.append('/mnt/sda1/code/github/lib-layout/layout/jeff')
+from backbone import CENet as AINet
 
 import logging
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-
 # parameters
 # train_config='config/train_retouch_config.yaml'
-train_config='config/train_segment_config.yaml'
+# train_config='config/train_segment_config.yaml'
+train_config='config/train_cinlayout_config.yaml'
 support_models = {
     'unet': 'BaseModel',
     'retouch': 'RetouchModel',
     'segment': 'SegmentModel',
+    'layout': 'LayoutModel',
 }
 
 #TODO: load config
@@ -45,7 +50,7 @@ def train(model_pointer=MODEL_PT, train_cfg=train_cfg, model_cfg="config/retourc
     #TODO: init model
     model = model_pointer(
         AINet=AINet,
-        input_channels=3,
+        input_channels=1,
         weights_path=train_cfg.get("pretrained_path"),
         config=model_cfg,
         mode="training",
