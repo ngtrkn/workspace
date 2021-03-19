@@ -391,6 +391,48 @@ class BaseModel:
 
 
     @torch.no_grad()
+    def debug(self, x, y=[], batch_size=2, use_augmentation=False, default_height=1024, num_workers=0, debug_path="debug"):
+        os.makedirs(debug_path, exist_ok=True)
+        if not y:
+            y = [[] for i in range(len(x))]
+        #TODO: set up dataloader
+        dataset_loader = self._setup_dataloader(
+            x, y,
+            batch_size=batch_size,
+            use_augmentation=use_augmentation,
+            default_height=default_height,
+            num_workers=num_workers
+        )
+
+        for i, (image, labels) in enumerate(dataset_loader):
+            #TODO: loading data into device
+            input_ = image.to(self.device).detach().float()
+
+            #TODO: inferring
+            output_ = self.model(input_)
+            outputs = [output_[:, i, :, :] for i in range(output_.shape[1])]
+            
+
+            if not labels:
+                targets = []
+            else:
+                targets = [mask.to(self.device).detach().float() for mask in masks_list]
+
+            #TODO: store debug
+            debug_img = torch.cat([(1 + image) / 2.] + \
+                            [output.unsqueeze(1).detach().cpu() for output in outputs] + \
+                            [target.unsqueeze(1).detach().cpu() for target in targets], dim=0)
+            
+            save_image(
+                    debug_img,
+                    f"{debug_path}/{i}.jpg",
+                    nrow=output_.shape[0],
+                    padding=5,
+                    pad_value=128,
+                    normalize=False)
+        
+
+    @torch.no_grad()
     def process(self, image_path):
         raise NotImplemented
 
