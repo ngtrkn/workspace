@@ -8,7 +8,7 @@ from data_utils.create_data_layout import create_train_data
 
 # from models import AUnet as AINet
 import sys
-sys.path.append('/mnt/sda1/code/github/lib-layout/layout/jeff')
+sys.path.append('/home/rsa-key-20200408/code/github/lib-layout/layout/jeff')
 from backbone import CENet as AINet
 
 import logging
@@ -90,8 +90,24 @@ def train(model_pointer=MODEL_PT, train_cfg=train_cfg, model_cfg="config/retourc
             model.save(save_path)
 
 
-
+def evaluate(model_pointer=MODEL_PT, train_cfg=train_cfg, model_cfg="config/retourch_config.yaml"):
+    model = model_pointer(
+        AINet=AINet,
+        input_channels=1,
+        weights_path=train_cfg.get("pretrained_path"),
+        config=model_cfg,
+        mode="debug",
+        device=train_cfg.get('gpu_ids', '-1'),
+        num_classes=train_cfg.get('num_classes', 4),
+    )
+    model.debug(
+        ["/mnt/prj_flax_kawasakikisen_poc/jeff-layout/Okaya_Linecut_Only/18156.jpg",
+        "/mnt/prj_flax_kawasakikisen_poc/jeff-layout/Tokyo_Marine_50_files/20190418220709_1.jpg",
+        "/mnt/prj_flax_kawasakikisen_poc/jeff-layout/ShowaDenko_Training_Data/KNS20191201_1.jpg",
+        "/mnt/prj_flax_kawasakikisen_poc/jeff-layout/Prudential_train/2019072410350031-197_1.jpg"],
+        batch_size=4)
 
 
 if __name__=='__main__':
-    train()
+    # train()
+    evaluate()
